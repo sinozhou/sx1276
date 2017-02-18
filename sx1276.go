@@ -10,60 +10,60 @@ import (
 )
 
 const (
-	RegFifo                = 0x00 //FIFO read/write access
-	RegOpMode              = 0x01 //Operating mode and LoRa / FSK selection
-	RegFrfMsb              = 0x06 //RF Carrier Frequency
-	RegFrfMid              = 0x07 //RF Carrier Frequency
-	RegFrfLsb              = 0x08 //RF Carrier Frequency, fRF = (F(XOSC)*Frf) / 1<<19
-	RegPaConfig            = 0x09 //PA selection and Output Power control
-	RegPaRamp              = 0x0A //Control of PA ramp time, low phase noise PLL
-	RegOcp                 = 0x0B //Over Current Protection control
-	RegLna                 = 0x0C //LNA settings
-	RegFifoAddrPtr         = 0x0D //FIFO SPI pointer
-	RegFifoTxBaseAddr      = 0x0E //Start Tx data
-	RegFifoRxBaseAddr      = 0x0F //Start Rx data
-	RegFifoRxCurrentAddr   = 0x10 //Start address of last packet received
-	RegIrqFlagsMask        = 0x11 //Optional IRQ flag mask
-	RegIrqFlags            = 0x12 //IRQ flags
-	RegRxNbBytes           = 0x13 //Number of received bytes
-	RegRxHeaderCntValueMsb = 0x14 //Number of valid headers received
-	RegRxHeaderCntValueLsb = 0x15 //Number of valid headers received
-	RegRxPacketCntValueMsb = 0x16 //Number of valid packets received
-	RegRxPacketCntValueLsb = 0x17 //Number of valid packets received
-	RegModemStat           = 0x18 //Live LoRa modem status
-	RegPktSnrValue         = 0x19 //Estimation of last packet SNR
-	RegPktRssiValue        = 0x1A //RSSI of last packet
-	RegRssiValue           = 0x1B //Current RSSI
-	RegHopChannel          = 0x1C //FHSS start channel
-	RegModemConfig1        = 0x1D //Modem PHY config
-	RegModemConfig2        = 0x1E //Modem PHY config
-	RegSymbTimeoutLsb      = 0x1F //Recevier timeout value
-	RegPreambleMsb         = 0x20 //Size of Preamble
-	RegPreambleLsb         = 0x20 //Size of Preamble
-	RegPayloadLength       = 0x22 //LoRa payload length
-	RegMaxPayloadLength    = 0x23 //LoRa maximum payload length
-	RegHopPeriod           = 0x24 //FHSS Hop period
-	RegFifoRxByteAddr      = 0x25 //Address of last byte written in FIFO
-	RegModemConfig3        = 0x26 //Modem PHY config
-	RegFeiMsb              = 0x28 //Estimated frequency error
-	RegFeiMid              = 0x29 //Estimated frequency error
-	RegFeiLsb              = 0x2A //Estimated frequency error
-	RegRssiWideband        = 0x2C //Wideband RSSI measurement
-	RegDetectOptimize      = 0x31 //LoRa detection Optimize for SF6
-	RegInvertIQ            = 0x33 //Invert LoRa I and Q
-	RegDetectionThreshold  = 0x37 //LoRa detection theshold for SF6
-	RegSyncWord            = 0x39 //LoRa Sync Word
-	RegDioMapping1         = 0x40 //Mapping of pins DIO0 to DIO3
-	RegDioMapping2         = 0x41 //Mapping of pins DIO4 and DIO5, ClkOut frequency
-	RegVersion             = 0x42 //Semtech ID relating the silicon revision
-	RegTcxo                = 0x4B //TCXO or XTAL input setting
-	RegPaDac               = 0x4D //Higher power settings of the PA
-	RegFormerTemp          = 0x5B //Stored temperature during the former IQ Calibration
-	RegAgcRef              = 0x61 //Adjustment of the AGC thresholds
-	RegAgcThresh1          = 0x62 //Adjustment of the AGC thresholds
-	RegAgcThresh2          = 0x63 //Adjustment of the AGC thresholds
-	RegAgcThresh3          = 0x64 //Adjustment of the AGC thresholds
-	RegPll                 = 0x70 //Control of the PLL bandwidth
+	RegFifo                = 0x00 // FIFO read/write access
+	RegOpMode              = 0x01 // Operating mode and LoRa / FSK selection
+	RegFrfMsb              = 0x06 // RF Carrier Frequency
+	RegFrfMid              = 0x07 // RF Carrier Frequency
+	RegFrfLsb              = 0x08 // RF Carrier Frequency, fRF = (F(XOSC)*Frf) / 1<<19
+	RegPaConfig            = 0x09 // PA selection and Output Power control
+	RegPaRamp              = 0x0A // Control of PA ramp time, low phase noise PLL
+	RegOcp                 = 0x0B // Over Current Protection control
+	RegLna                 = 0x0C // LNA settings
+	RegFifoAddrPtr         = 0x0D // FIFO SPI pointer
+	RegFifoTxBaseAddr      = 0x0E // Start Tx data
+	RegFifoRxBaseAddr      = 0x0F // Start Rx data
+	RegFifoRxCurrentAddr   = 0x10 // Start address of last packet received
+	RegIrqFlagsMask        = 0x11 // Optional IRQ flag mask
+	RegIrqFlags            = 0x12 // IRQ flags
+	RegRxNbBytes           = 0x13 // Number of received bytes
+	RegRxHeaderCntValueMsb = 0x14 // Number of valid headers received
+	RegRxHeaderCntValueLsb = 0x15 // Number of valid headers received
+	RegRxPacketCntValueMsb = 0x16 // Number of valid packets received
+	RegRxPacketCntValueLsb = 0x17 // Number of valid packets received
+	RegModemStat           = 0x18 // Live LoRa modem status
+	RegPktSnrValue         = 0x19 // Estimation of last packet SNR
+	RegPktRssiValue        = 0x1A // RSSI of last packet
+	RegRssiValue           = 0x1B // Current RSSI
+	RegHopChannel          = 0x1C // FHSS start channel
+	RegModemConfig1        = 0x1D // Modem PHY config
+	RegModemConfig2        = 0x1E // Modem PHY config
+	RegSymbTimeoutLsb      = 0x1F // Recevier timeout value
+	RegPreambleMsb         = 0x20 // Size of Preamble
+	RegPreambleLsb         = 0x20 // Size of Preamble
+	RegPayloadLength       = 0x22 // LoRa payload length
+	RegMaxPayloadLength    = 0x23 // LoRa maximum payload length
+	RegHopPeriod           = 0x24 // FHSS Hop period
+	RegFifoRxByteAddr      = 0x25 // Address of last byte written in FIFO
+	RegModemConfig3        = 0x26 // Modem PHY config
+	RegFeiMsb              = 0x28 // Estimated frequency error
+	RegFeiMid              = 0x29 // Estimated frequency error
+	RegFeiLsb              = 0x2A // Estimated frequency error
+	RegRssiWideband        = 0x2C // Wideband RSSI measurement
+	RegDetectOptimize      = 0x31 // LoRa detection Optimize for SF6
+	RegInvertIQ            = 0x33 // Invert LoRa I and Q
+	RegDetectionThreshold  = 0x37 // LoRa detection theshold for SF6
+	RegSyncWord            = 0x39 // LoRa Sync Word
+	RegDioMapping1         = 0x40 // Mapping of pins DIO0 to DIO3
+	RegDioMapping2         = 0x41 // Mapping of pins DIO4 and DIO5, ClkOut frequency
+	RegVersion             = 0x42 // Semtech ID relating the silicon revision
+	RegTcxo                = 0x4B // TCXO or XTAL input setting
+	RegPaDac               = 0x4D // Higher power settings of the PA
+	RegFormerTemp          = 0x5B // Stored temperature during the former IQ Calibration
+	RegAgcRef              = 0x61 // Adjustment of the AGC thresholds
+	RegAgcThresh1          = 0x62 // Adjustment of the AGC thresholds
+	RegAgcThresh2          = 0x63 // Adjustment of the AGC thresholds
+	RegAgcThresh3          = 0x64 // Adjustment of the AGC thresholds
+	RegPll                 = 0x70 // Control of the PLL bandwidth
 )
 
 const (
@@ -353,6 +353,17 @@ func (sx SX1276) SetSpreadingFactor(sf SpreadingFactor) error {
 	}
 
 	return sx.WriteReg(RegModemConfig2, (regModemConfig2&0x0F)|byte(sf)<<4)
+}
+
+func (sx SX1276) LastPktRSSI() (float64, error) {
+	// We're assuming HF port here.
+	rssi, err := sx.ReadReg(RegPktRssiValue)
+	return -157 + float64(rssi), err
+}
+
+func (sx SX1276) LastPktSNR() (float64, error) {
+	snr, err := sx.ReadReg(RegPktSnrValue)
+	return (float64(snr) - 127) / 4.0, err
 }
 
 // Transmit payload. This method assumes the transceiver's operating mode is

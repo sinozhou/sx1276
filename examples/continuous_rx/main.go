@@ -33,15 +33,15 @@ func main() {
 	// StartRxContinuous produces a channel of byte slices on which packets
 	// will be sent.
 	pkts := sx.StartRxContinuous()
-	last := time.Now()
 
 	for {
 		// Either receive a packet or timeout.
 		select {
 		case pkt := <-pkts:
-			now := time.Now()
-			log.Printf("%q, %s\n", pkt, now.Sub(last))
-			last = now
+			rssi, _ := sx.LastPktRSSI()
+			snr, _ := sx.LastPktSNR()
+
+			log.Printf("%q, RSSI: %0.0f SNR: %0.1f\n", pkt, rssi, snr)
 		case <-after:
 			sx.StopRxContinuous()
 			return
