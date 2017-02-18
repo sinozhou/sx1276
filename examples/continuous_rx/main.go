@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"time"
 
@@ -12,6 +13,10 @@ func init() {
 }
 
 func main() {
+	duration := flag.Duration("duration", 10*time.Second, "length of time to listen, 0 to listen forever")
+
+	flag.Parse()
+
 	// Instantiate a new SX1276
 	sx, err := sx1276.NewSX1276()
 	if err != nil {
@@ -20,17 +25,23 @@ func main() {
 	defer sx.Close()
 
 	// Receive for 10 seconds.
-	after := time.After(10 * time.Second)
+	after := make(<-chan time.Time)
+	if *duration > time.Duration(0) {
+		after = time.After(*duration)
+	}
 
 	// StartRxContinuous produces a channel of byte slices on which packets
 	// will be sent.
 	pkts := sx.StartRxContinuous()
+	last := time.Now()
 
 	for {
 		// Either receive a packet or timeout.
 		select {
 		case pkt := <-pkts:
-			log.Printf("%q\n", pkt)
+			now := time.Now()
+			log.Printf("%q, %s\n", pkt, now.Sub(last))
+			last = now
 		case <-after:
 			sx.StopRxContinuous()
 			return
