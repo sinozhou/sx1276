@@ -181,11 +181,11 @@ func TestInitialize4Bit_lcdInit(t *testing.T) {
 	mock := newMockGPIOConnection()
 	gpio, _ := NewGPIO(mock.rs, mock.en, mock.d4, mock.d5, mock.d6, mock.d7, mock.backlight, Negative, testRowAddr)
 	instructions := []instruction{
-		instruction{embd.Low, lcdInit},
-		instruction{embd.Low, lcdInit4bit},
-		instruction{embd.Low, byte(gpio.eMode | lcdSetEntryMode)},
-		instruction{embd.Low, byte(gpio.dMode | lcdSetDisplayMode)},
-		instruction{embd.Low, byte(gpio.fMode | lcdSetFunctionMode)},
+		{embd.Low, lcdInit},
+		{embd.Low, lcdInit4bit},
+		{embd.Low, byte(gpio.eMode | lcdSetEntryMode)},
+		{embd.Low, byte(gpio.dMode | lcdSetDisplayMode)},
+		{embd.Low, byte(gpio.fMode | lcdSetFunctionMode)},
 	}
 
 	if !reflect.DeepEqual(instructions, mock.writes) {
@@ -209,7 +209,7 @@ func TestGPIOConnectionClose(t *testing.T) {
 
 func TestI2CConnectionPinMap(t *testing.T) {
 	cases := []map[string]interface{}{
-		map[string]interface{}{
+		{
 			"instruction": lcdDisplayMove | lcdMoveRight,
 			"pinMap":      MJKDZPinMap,
 			"expected": []byte{
@@ -221,7 +221,7 @@ func TestI2CConnectionPinMap(t *testing.T) {
 				0xc,  // 00001100
 			},
 		},
-		map[string]interface{}{
+		{
 			"instruction": lcdDisplayMove | lcdMoveRight,
 			"pinMap":      PCF8574PinMap,
 			"expected": []byte{

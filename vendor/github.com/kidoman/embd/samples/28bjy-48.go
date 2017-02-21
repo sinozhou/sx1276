@@ -56,14 +56,14 @@ func main() {
 
 	// Define sequence described in manufacturer's datasheet
 	seq := [][]int{
-		[]int{1, 0, 0, 0},
-		[]int{1, 1, 0, 0},
-		[]int{0, 1, 0, 0},
-		[]int{0, 1, 1, 0},
-		[]int{0, 0, 1, 0},
-		[]int{0, 0, 1, 1},
-		[]int{0, 0, 0, 1},
-		[]int{1, 0, 0, 1},
+		{1, 0, 0, 0},
+		{1, 1, 0, 0},
+		{0, 1, 0, 0},
+		{0, 1, 1, 0},
+		{0, 0, 1, 0},
+		{0, 0, 1, 1},
+		{0, 0, 0, 1},
+		{1, 0, 0, 1},
 	}
 	stepCount := len(seq) - 1
 	stepDir := 2 // Set to 1 or 2 for clockwise, -1 or -2 for counter-clockwise

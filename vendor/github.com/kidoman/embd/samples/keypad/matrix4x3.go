@@ -4,9 +4,9 @@ package main
 
 import (
 	"fmt"
-	"time"
 	"github.com/kidoman/embd"
 	"github.com/kidoman/embd/interface/keypad/matrix4x3"
+	"time"
 )
 
 func main() {

@@ -79,7 +79,7 @@ func TestNewline(t *testing.T) {
 	disp.Newline()
 
 	expectedCalls := []call{
-		call{"SetCursor", []interface{}{0, 1}},
+		{"SetCursor", []interface{}{0, 1}},
 	}
 
 	mock.testExpectedCalls(expectedCalls, t)
@@ -91,8 +91,8 @@ func TestMessage(t *testing.T) {
 	disp.Message("ab")
 
 	expectedCalls := []call{
-		call{"WriteChar", []interface{}{byte('a')}},
-		call{"WriteChar", []interface{}{byte('b')}},
+		{"WriteChar", []interface{}{byte('a')}},
+		{"WriteChar", []interface{}{byte('b')}},
 	}
 
 	mock.testExpectedCalls(expectedCalls, t)
@@ -104,9 +104,9 @@ func TestMessage_newLine(t *testing.T) {
 	disp.Message("a\nb")
 
 	expectedCalls := []call{
-		call{"WriteChar", []interface{}{byte('a')}},
-		call{"SetCursor", []interface{}{0, 1}},
-		call{"WriteChar", []interface{}{byte('b')}},
+		{"WriteChar", []interface{}{byte('a')}},
+		{"SetCursor", []interface{}{0, 1}},
+		{"WriteChar", []interface{}{byte('b')}},
 	}
 
 	mock.testExpectedCalls(expectedCalls, t)
@@ -119,10 +119,10 @@ func TestMessage_wrap(t *testing.T) {
 	disp.Message("ab")
 
 	expectedCalls := []call{
-		call{"SetCursor", []interface{}{cols - 1, 0}},
-		call{"WriteChar", []interface{}{byte('a')}},
-		call{"SetCursor", []interface{}{0, 1}},
-		call{"WriteChar", []interface{}{byte('b')}},
+		{"SetCursor", []interface{}{cols - 1, 0}},
+		{"WriteChar", []interface{}{byte('a')}},
+		{"SetCursor", []interface{}{0, 1}},
+		{"WriteChar", []interface{}{byte('b')}},
 	}
 
 	mock.testExpectedCalls(expectedCalls, t)
