@@ -133,12 +133,8 @@ func NewSX1276() (sx *SX1276, err error) {
 
 	// Check chip version.
 	// SX1276's should return 0x12
-	if val, err := sx.ReadReg(RegVersion); err != nil {
-		return nil, err
-	} else {
-		if val != 0x12 {
-			return nil, errors.New("invalid receiver version")
-		}
+	if val := sx.ReadReg(RegVersion); val != 0x12 {
+		return nil, errors.New("invalid receiver version")
 	}
 
 	// Enable LoRa and set the transceiver's mode to standby.
@@ -151,12 +147,9 @@ func NewSX1276() (sx *SX1276, err error) {
 	}
 
 	// Set maximum payload length and configure output power.
-	err = sx.WriteReg(RegMaxPayloadLength, 0x80)
-	if err != nil {
-		return nil, err
-	}
+	sx.WriteReg(RegMaxPayloadLength, 0x80)
 
-	err = sx.WriteReg(RegPaConfig, 0xCF)
+	sx.WriteReg(RegPaConfig, 0xCF)
 
 	return
 }
@@ -174,30 +167,35 @@ func (sx SX1276) Close() {
 }
 
 // Reads the register at addr.
-func (sx SX1276) ReadReg(addr byte) (byte, error) {
+func (sx SX1276) ReadReg(addr byte) byte {
 	sx.ss.Write(embd.Low)
 	defer sx.ss.Write(embd.High)
 
 	buf := []byte{addr & 0x7F, 0}
 	err := sx.spi.TransferAndReceiveData(buf)
+	if err != nil {
+		panic(err)
+	}
 
-	return buf[1], err
+	return buf[1]
 }
 
 // Writes val to the register at addr.
-func (sx SX1276) WriteReg(addr, val byte) error {
+func (sx SX1276) WriteReg(addr, val byte) {
 	sx.ss.Write(embd.Low)
 	defer sx.ss.Write(embd.High)
 
 	buf := []byte{addr | 0x80, val}
-
-	return sx.spi.TransferAndReceiveData(buf)
+	err := sx.spi.TransferAndReceiveData(buf)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Reads n number of values from the registers beginning at addr, increasing sequentially.
-func (sx SX1276) ReadRegBurst(addr byte, n int) ([]byte, error) {
+func (sx SX1276) ReadRegBurst(addr byte, n int) []byte {
 	if n < 0 || n > 0xFF || int(addr)+n > 0xFF {
-		return nil, errors.New("invalid number of registers")
+		panic(errors.New("invalid number of registers"))
 	}
 
 	sx.ss.Write(embd.Low)
@@ -206,22 +204,29 @@ func (sx SX1276) ReadRegBurst(addr byte, n int) ([]byte, error) {
 	buf := make([]byte, n+1)
 	buf[0] = addr & 0x7F
 	err := sx.spi.TransferAndReceiveData(buf)
+	if err != nil {
+		panic(err)
+	}
 
-	return buf[1:], err
+	return buf[1:]
 }
 
 // Writes val to the registers beginning at addr, increasing sequentially.
-func (sx SX1276) WriteRegBurst(addr byte, val ...byte) error {
+func (sx SX1276) WriteRegBurst(addr byte, val ...byte) {
 	if len(val) > 255 {
-		return errors.New("invalid number of registers to write")
+		panic(errors.New("invalid number of registers to write"))
 	}
 
 	sx.ss.Write(embd.Low)
 	defer sx.ss.Write(embd.High)
 
 	buf := append([]byte{addr | 0x80}, val...)
+	err := sx.spi.TransferAndReceiveData(buf)
+	if err != nil {
+		panic(err)
+	}
 
-	return sx.spi.TransferAndReceiveData(buf)
+	return
 }
 
 type OpMode byte
@@ -243,12 +248,10 @@ func (sx SX1276) SetOpMode(mode OpMode) error {
 		return errors.New("invalid operating mode")
 	}
 
-	val, err := sx.ReadReg(RegOpMode)
-	if err != nil {
-		return err
-	}
+	val := sx.ReadReg(RegOpMode)
+	sx.WriteReg(RegOpMode, (val&0xF8)|byte(mode))
 
-	return sx.WriteReg(RegOpMode, (val&0xF8)|byte(mode))
+	return nil
 }
 
 func (sx SX1276) SetFrequency(freq float64) error {
@@ -257,17 +260,15 @@ func (sx SX1276) SetFrequency(freq float64) error {
 	}
 
 	uFreq := (uint64(freq) << 19) / 32000000
+	sx.WriteRegBurst(RegFrfMsb, byte(uFreq>>16), byte(uFreq>>8), byte(uFreq))
 
-	return sx.WriteRegBurst(RegFrfMsb, byte(uFreq>>16), byte(uFreq>>8), byte(uFreq))
+	return nil
 }
 
-func (sx SX1276) GetFrequency() (float64, error) {
-	freq, err := sx.ReadRegBurst(RegFrfMsb, 3)
-	if err != nil {
-		return 0, err
-	}
+func (sx SX1276) GetFrequency() float64 {
+	freq := sx.ReadRegBurst(RegFrfMsb, 3)
 
-	return float64(((uint64(freq[0])<<16 + uint64(freq[1])<<8 + uint64(freq[2])) * 32000000) >> 19), err
+	return float64(((uint64(freq[0])<<16 + uint64(freq[1])<<8 + uint64(freq[2])) * 32000000) >> 19)
 }
 
 type Bandwidth byte
@@ -289,12 +290,10 @@ func (sx SX1276) SetBandwidth(bw Bandwidth) error {
 	if bw > BW500 {
 		return errors.New("invalid bandwidth")
 	}
-	regModemConfig1, err := sx.ReadReg(RegModemConfig1)
-	if err != nil {
-		return err
-	}
+	regModemConfig1 := sx.ReadReg(RegModemConfig1)
+	sx.WriteReg(RegModemConfig1, (regModemConfig1&0x0F)|byte(bw)<<4)
 
-	return sx.WriteReg(RegModemConfig1, (regModemConfig1&0x0F)|byte(bw)<<4)
+	return nil
 }
 
 type CodingRate byte
@@ -310,24 +309,20 @@ func (sx SX1276) SetCodingRate(cr CodingRate) error {
 	if cr < CR45 || cr > CR48 {
 		return errors.New("invalid coding rate")
 	}
-	regModemConfig1, err := sx.ReadReg(RegModemConfig1)
-	if err != nil {
-		return err
-	}
+	regModemConfig1 := sx.ReadReg(RegModemConfig1)
+	sx.WriteReg(RegModemConfig1, (regModemConfig1&0xF1)|byte(cr)<<1)
 
-	return sx.WriteReg(RegModemConfig1, (regModemConfig1&0xF1)|byte(cr)<<1)
+	return nil
 }
 
-func (sx SX1276) SetImplicitHeader(enable bool) error {
-	regModemConfig1, err := sx.ReadReg(RegModemConfig1)
-	if err != nil {
-		return err
-	}
+func (sx SX1276) SetImplicitHeader(enable bool) {
+	regModemConfig1 := sx.ReadReg(RegModemConfig1)
 
 	if enable {
-		return sx.WriteReg(RegModemConfig1, regModemConfig1|0x01)
+		sx.WriteReg(RegModemConfig1, regModemConfig1|0x01)
+	} else {
+		sx.WriteReg(RegModemConfig1, regModemConfig1&0xFE)
 	}
-	return sx.WriteReg(RegModemConfig1, regModemConfig1&0xFE)
 }
 
 type SpreadingFactor byte
@@ -347,110 +342,82 @@ func (sx SX1276) SetSpreadingFactor(sf SpreadingFactor) error {
 		return errors.New("invalid spreading factor")
 	}
 
-	regModemConfig2, err := sx.ReadReg(RegModemConfig2)
-	if err != nil {
-		return err
-	}
-
-	return sx.WriteReg(RegModemConfig2, (regModemConfig2&0x0F)|byte(sf)<<4)
-}
-
-func (sx SX1276) LastPktRSSI() (float64, error) {
-	// We're assuming HF port here.
-	rssi, err := sx.ReadReg(RegPktRssiValue)
-	return -157 + float64(rssi), err
-}
-
-func (sx SX1276) LastPktSNR() (float64, error) {
-	snr, err := sx.ReadReg(RegPktSnrValue)
-	return (float64(snr) - 127) / 4.0, err
-}
-
-// Transmit payload. This method assumes the transceiver's operating mode is
-// either SLEEP or STDBY.
-func (sx SX1276) Tx(payload []byte) (err error) {
-	// Enable TxDone interrupt on DIO0.
-	err = sx.WriteReg(RegDioMapping1, 0x40)
-	if err != nil {
-		return
-	}
-
-	// Set the FIFO's starting address.
-	err = sx.WriteReg(RegFifoAddrPtr, FifoTxBaseAddr)
-	if err != nil {
-		return
-	}
-
-	// Set the number of bytes to be transmitted.
-	err = sx.WriteReg(RegPayloadLength, byte(len(payload)))
-	if err != nil {
-		return
-	}
-
-	// Write the payload to the FIFO.
-	err = sx.WriteRegBurst(RegFifo, payload...)
-	if err != nil {
-		return
-	}
-
-	// Begin transmission.
-	err = sx.SetOpMode(TX)
-	if err != nil {
-		return
-	}
-
-	// Wait for TxDone
-	<-sx.IrqDIO0
-
-	// Clear TxDone interrupt on DIO0.
-	err = sx.WriteReg(RegIrqFlags, 0x08)
-	if err != nil {
-		return
-	}
+	regModemConfig2 := sx.ReadReg(RegModemConfig2)
+	sx.WriteReg(RegModemConfig2, (regModemConfig2&0x0F)|byte(sf)<<4)
 
 	return nil
 }
 
+// Enable Spreading Factor 6 specific register values.
+func (sx SX1276) EnableSF6() {
+	sx.SetSpreadingFactor(SF6) // Set Spreading Factor to SF6
+	sx.SetImplicitHeader(true) // Enable ImplicitHeader
+
+	// Set DetectionOptimize in RegDetectOptimize to the SF6 specific value.
+	regDetectOptimize := sx.ReadReg(RegDetectOptimize)
+	sx.WriteReg(RegDetectOptimize, (regDetectOptimize&0xF8)|0x05)
+
+	// Set RegDetectionThreshold to the SF6 specific value.
+	sx.WriteReg(RegDetectionThreshold, 0x0C)
+}
+
+// Reset Spreading Factor 6 specific register values for SF7-12 use.
+func (sx SX1276) DisableSF6() {
+	sx.SetSpreadingFactor(SF7)  // Set Spreading Factor to SF7
+	sx.SetImplicitHeader(false) // Disable ImplicitHeader
+
+	// Set DetectionOptimize in RegDetectOptimize to the SF7-12 specific value.
+	regDetectOptimize := sx.ReadReg(RegDetectOptimize)
+	sx.WriteReg(RegDetectOptimize, (regDetectOptimize&0xF8)|0x03)
+
+	// Set RegDetectionThreshold to the SF7-12 specific value.
+	sx.WriteReg(RegDetectionThreshold, 0x0A)
+}
+
+func (sx SX1276) LastPktRSSI() float64 {
+	// We're assuming HF port here.
+	rssi := sx.ReadReg(RegPktRssiValue)
+	return -157 + float64(rssi)
+}
+
+func (sx SX1276) LastPktSNR() float64 {
+	snr := sx.ReadReg(RegPktSnrValue)
+	return (float64(snr) - 127) / 4.0
+}
+
+func (sx SX1276) LastPktPower() float64 {
+	return sx.LastPktRSSI() + sx.LastPktSNR()
+}
+
+// Transmit payload. This method assumes the transceiver's operating mode is
+// either SLEEP or STDBY.
+func (sx SX1276) Tx(payload []byte) {
+	sx.WriteReg(RegDioMapping1, 0x40)                 // Enable TxDone interrupt on DIO0.
+	sx.WriteReg(RegFifoAddrPtr, FifoTxBaseAddr)       // Set the FIFO's starting address.
+	sx.WriteReg(RegPayloadLength, byte(len(payload))) // Set the number of bytes to be transmitted.
+	sx.WriteRegBurst(RegFifo, payload...)             // Write the payload to the FIFO.
+	sx.SetOpMode(TX)                                  // Begin transmission.
+	<-sx.IrqDIO0                                      // Wait for TxDone
+	sx.WriteReg(RegIrqFlags, 0x08)                    // Clear TxDone interrupt on DIO0.
+}
+
 func (sx SX1276) rx() ([]byte, error) {
 	// Get the current IRQ flags.
-	irqFlags, err := sx.ReadReg(RegIrqFlags)
-	if err != nil {
-		return nil, err
-	}
+	irqFlags := sx.ReadReg(RegIrqFlags)
 
 	// If the PayloadCrcError interrupt flag is asserted, clear the flag and
 	// return an error.
 	if irqFlags&0x20 == 0x20 {
-		err := sx.WriteReg(RegIrqFlags, 0x20)
-		if err != nil {
-			return nil, err
-		}
-
+		sx.WriteReg(RegIrqFlags, 0x20)
 		return nil, errors.New("bad crc")
 	}
 
-	// Get the current Rx FIFO starting address.
-	currentAddr, err := sx.ReadReg(RegFifoRxCurrentAddr)
-	if err != nil {
-		return nil, err
-	}
+	rxAddr := sx.ReadReg(RegFifoRxCurrentAddr)        // Get the current Rx FIFO starting address.
+	sx.WriteReg(RegFifoAddrPtr, rxAddr)               // Move the FIFO to the beginning of the received bytes.
+	rxBytes := sx.ReadReg(RegRxNbBytes)               // Get the number of received bytes.
+	payload := sx.ReadRegBurst(RegFifo, int(rxBytes)) // Read the payload from the FIFO.
 
-	// Get the number of received bytes.
-	receivedBytes, err := sx.ReadReg(RegRxNbBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	// Move the FIFO to the beginning of the received bytes.
-	err = sx.WriteReg(RegFifoAddrPtr, currentAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	// Read the payload from the FIFO.
-	payload, err := sx.ReadRegBurst(RegFifo, int(receivedBytes))
-
-	return payload, err
+	return payload, nil
 }
 
 // Start receiving packets continuously. Sends received packets on the
@@ -484,8 +451,6 @@ func (sx *SX1276) StartRxContinuous() (pkts chan []byte) {
 					pkts <- pkt
 				}
 			case <-sx.stopRxContinuous:
-				// Reception has been requested to stop.
-				sx.stopRxContinuous <- struct{}{}
 				return
 			}
 		}
@@ -496,12 +461,7 @@ func (sx *SX1276) StartRxContinuous() (pkts chan []byte) {
 
 // Stop continuous reception.
 func (sx SX1276) StopRxContinuous() {
-	// Set mode to standby.
-	sx.SetOpMode(STDBY)
-	// Signal that the receiving goroutine should exit.
-	sx.stopRxContinuous <- struct{}{}
-	// Wait for goroutine to exit.
-	<-sx.stopRxContinuous
-	// Set the stop channel to nil for future use.
-	sx.stopRxContinuous = nil
+	sx.SetOpMode(STDBY)               // Set mode to standby.
+	sx.stopRxContinuous <- struct{}{} // Signal that the receiving goroutine should exit.
+	sx.stopRxContinuous = nil         // Set the stop channel to nil for future use.
 }

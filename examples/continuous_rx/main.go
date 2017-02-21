@@ -38,10 +38,11 @@ func main() {
 		// Either receive a packet or timeout.
 		select {
 		case pkt := <-pkts:
-			rssi, _ := sx.LastPktRSSI()
-			snr, _ := sx.LastPktSNR()
+			rssi := sx.LastPktRSSI()
+			snr := sx.LastPktSNR()
+			dBm := sx.LastPktPower()
 
-			log.Printf("%q, RSSI: %0.0f SNR: %0.1f\n", pkt, rssi, snr)
+			log.Printf("%q, RSSI: %0.0f SNR: %0.1f dBm: %0.1f\n", pkt, rssi, snr, dBm)
 		case <-after:
 			sx.StopRxContinuous()
 			return
