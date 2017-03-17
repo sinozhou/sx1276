@@ -2,6 +2,7 @@ package sx1276
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -39,7 +40,7 @@ const (
 	RegModemConfig2        = 0x1E // Modem PHY config
 	RegSymbTimeoutLsb      = 0x1F // Recevier timeout value
 	RegPreambleMsb         = 0x20 // Size of Preamble
-	RegPreambleLsb         = 0x20 // Size of Preamble
+	RegPreambleLsb         = 0x21 // Size of Preamble
 	RegPayloadLength       = 0x22 // LoRa payload length
 	RegMaxPayloadLength    = 0x23 // LoRa maximum payload length
 	RegHopPeriod           = 0x24 // FHSS Hop period
@@ -72,27 +73,62 @@ const (
 )
 
 const (
-	SS   = 6
-	DIO0 = 7
-	RST  = 0
+	RST = "GPIO_22"
 )
 
 type SX1276 struct {
 	spi embd.SPIBus
 
-	ss   embd.DigitalPin
-	dio0 embd.DigitalPin
-	rst  embd.DigitalPin
+	rst embd.DigitalPin
 
-	IrqDIO0          chan struct{}
+	DIO0 InterruptPin
+	DIO1 InterruptPin
+	DIO2 InterruptPin
+	DIO3 InterruptPin
+	DIO4 InterruptPin
+	DIO5 InterruptPin
+
 	stopRxContinuous chan struct{}
+}
+
+type InterruptPin struct {
+	embd.DigitalPin
+
+	pinName string
+	rpiName string
+
+	Irq chan struct{}
+}
+
+func NewIntPin(pinName, rpiName string) (intPin InterruptPin, err error) {
+	intPin.pinName = pinName
+	intPin.Irq = make(chan struct{})
+
+	intPin.DigitalPin, err = embd.NewDigitalPin(rpiName)
+	if err != nil {
+		return
+	}
+
+	intPin.SetDirection(embd.In)
+	intPin.Watch(embd.EdgeRising, func(pin embd.DigitalPin) {
+		select {
+		case intPin.Irq <- struct{}{}:
+		default:
+		}
+	})
+
+	return
+}
+
+func (intPin InterruptPin) String() string {
+	return fmt.Sprintf("{PinName: %s RPiName: %s}", intPin.pinName, intPin.rpiName)
 }
 
 // Returns a new SX1276 controller. If an error is encountered, the returned controller
 // will be nil.
 func NewSX1276() (sx *SX1276, err error) {
 	// Currently only Raspberry Pi 3's are supported.
-	embd.SetHost(embd.HostRPi, 3)
+	embd.SetHost(embd.HostRPi, 0xA32082)
 
 	sx = new(SX1276)
 
@@ -108,37 +144,51 @@ func NewSX1276() (sx *SX1276, err error) {
 		return nil, err
 	}
 
-	// Setup SPI chip-select pin.
-	sx.ss, _ = embd.NewDigitalPin("GPIO_25")
-	sx.ss.SetDirection(embd.Out)
-	sx.ss.Write(embd.High)
-
-	// Setup DIO0 interrupt.
-	sx.dio0, _ = embd.NewDigitalPin("GPIO_4")
-	sx.dio0.SetDirection(embd.In)
-	sx.IrqDIO0 = make(chan struct{})
-	err = sx.dio0.Watch(embd.EdgeRising, func(pin embd.DigitalPin) {
-		sx.IrqDIO0 <- struct{}{}
-	})
-
 	// Setup RST pin.
-	sx.rst, _ = embd.NewDigitalPin("GPIO_17")
+	sx.rst, err = embd.NewDigitalPin(RST)
+	if err != nil {
+		return nil, err
+	}
 	err = sx.rst.SetDirection(embd.Out)
+	if err != nil {
+		return nil, err
+	}
 
-	// Reset device.
-	sx.rst.Write(embd.Low)
-	time.Sleep(10 * time.Microsecond)
+	// Reset the device.
 	sx.rst.Write(embd.High)
-	time.Sleep(5 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
+	sx.rst.Write(embd.Low)
+	time.Sleep(1 * time.Millisecond)
+	sx.rst.Write(embd.High)
+	time.Sleep(6 * time.Millisecond)
 
-	// Check chip version.
-	// SX1276's should return 0x12
+	// Check chip version. SX1276's should return 0x12
 	if val := sx.ReadReg(RegVersion); val != 0x12 {
 		return nil, errors.New("invalid receiver version")
 	}
 
-	// Enable LoRa and set the transceiver's mode to standby.
-	sx.WriteReg(RegOpMode, 0x80|byte(SLEEP))
+	// Put transceiver to sleep and enable LoRa.
+	sx.WriteReg(RegOpMode, 0x88)
+
+	// Setup DIO interrrupts.
+	if sx.DIO0, err = NewIntPin("DIO0", "GPIO_12"); err != nil {
+		return nil, err
+	}
+	if sx.DIO1, err = NewIntPin("DIO1", "GPIO_6"); err != nil {
+		return nil, err
+	}
+	if sx.DIO2, err = NewIntPin("DIO2", "GPIO_5"); err != nil {
+		return nil, err
+	}
+	if sx.DIO3, err = NewIntPin("DIO3", "GPIO_16"); err != nil {
+		return nil, err
+	}
+	if sx.DIO4, err = NewIntPin("DIO4", "GPIO_13"); err != nil {
+		return nil, err
+	}
+	if sx.DIO5, err = NewIntPin("DIO5", "GPIO_27"); err != nil {
+		return nil, err
+	}
 
 	// Set default frequency.
 	err = sx.SetFrequency(904500000)
@@ -148,29 +198,30 @@ func NewSX1276() (sx *SX1276, err error) {
 
 	// Set maximum payload length and configure output power.
 	sx.WriteReg(RegMaxPayloadLength, 0x80)
-
 	sx.WriteReg(RegPaConfig, 0xCF)
 
 	return
 }
 
 func (sx SX1276) Close() {
+	// Clean up GPIO pins.
+	sx.DIO0.Close()
+	sx.DIO1.Close()
+	sx.DIO2.Close()
+	sx.DIO3.Close()
+	sx.DIO4.Close()
+	sx.DIO5.Close()
+
+	sx.rst.Close()
+	embd.CloseGPIO()
+
 	// Clean up SPI connections.
 	sx.spi.Close()
 	embd.CloseSPI()
-
-	// Clean up GPIO pins.
-	sx.ss.Close()
-	sx.dio0.Close()
-	sx.rst.Close()
-	embd.CloseGPIO()
 }
 
 // Reads the register at addr.
 func (sx SX1276) ReadReg(addr byte) byte {
-	sx.ss.Write(embd.Low)
-	defer sx.ss.Write(embd.High)
-
 	buf := []byte{addr & 0x7F, 0}
 	err := sx.spi.TransferAndReceiveData(buf)
 	if err != nil {
@@ -182,9 +233,6 @@ func (sx SX1276) ReadReg(addr byte) byte {
 
 // Writes val to the register at addr.
 func (sx SX1276) WriteReg(addr, val byte) {
-	sx.ss.Write(embd.Low)
-	defer sx.ss.Write(embd.High)
-
 	buf := []byte{addr | 0x80, val}
 	err := sx.spi.TransferAndReceiveData(buf)
 	if err != nil {
@@ -197,9 +245,6 @@ func (sx SX1276) ReadRegBurst(addr byte, n int) []byte {
 	if n < 0 || n > 0xFF || int(addr)+n > 0xFF {
 		panic(errors.New("invalid number of registers"))
 	}
-
-	sx.ss.Write(embd.Low)
-	defer sx.ss.Write(embd.High)
 
 	buf := make([]byte, n+1)
 	buf[0] = addr & 0x7F
@@ -216,9 +261,6 @@ func (sx SX1276) WriteRegBurst(addr byte, val ...byte) {
 	if len(val) > 255 {
 		panic(errors.New("invalid number of registers to write"))
 	}
-
-	sx.ss.Write(embd.Low)
-	defer sx.ss.Write(embd.High)
 
 	buf := append([]byte{addr | 0x80}, val...)
 	err := sx.spi.TransferAndReceiveData(buf)
@@ -248,8 +290,16 @@ func (sx SX1276) SetOpMode(mode OpMode) error {
 		return errors.New("invalid operating mode")
 	}
 
+	// The ModeReady interrupt may occur on DIO5 before we've returned from
+	// writing the new OpMode, so start listening _before_ we write anything.
+	dio5 := make(chan struct{})
+	go func() {
+		dio5 <- <-sx.DIO5.Irq
+	}()
+
 	val := sx.ReadReg(RegOpMode)
 	sx.WriteReg(RegOpMode, (val&0xF8)|byte(mode))
+	<-dio5
 
 	return nil
 }
@@ -397,7 +447,7 @@ func (sx SX1276) Tx(payload []byte) {
 	sx.WriteReg(RegPayloadLength, byte(len(payload))) // Set the number of bytes to be transmitted.
 	sx.WriteRegBurst(RegFifo, payload...)             // Write the payload to the FIFO.
 	sx.SetOpMode(TX)                                  // Begin transmission.
-	<-sx.IrqDIO0                                      // Wait for TxDone
+	<-sx.DIO0.Irq                                     // Wait for TxDone on DIO0.
 	sx.WriteReg(RegIrqFlags, 0x08)                    // Clear TxDone interrupt on DIO0.
 }
 
@@ -441,7 +491,7 @@ func (sx *SX1276) StartRxContinuous() (pkts chan []byte) {
 	go func() {
 		for {
 			select {
-			case <-sx.IrqDIO0:
+			case <-sx.DIO0.Irq:
 				// DIO0's interrupt has occured. Clear RxDone IRQ.
 				sx.WriteReg(RegIrqFlags, 0x40)
 				// Receive the packet's payload or print an error.
@@ -461,7 +511,7 @@ func (sx *SX1276) StartRxContinuous() (pkts chan []byte) {
 
 // Stop continuous reception.
 func (sx SX1276) StopRxContinuous() {
-	sx.SetOpMode(STDBY)               // Set mode to standby.
 	sx.stopRxContinuous <- struct{}{} // Signal that the receiving goroutine should exit.
+	sx.SetOpMode(STDBY)               // Set mode to standby.
 	sx.stopRxContinuous = nil         // Set the stop channel to nil for future use.
 }
