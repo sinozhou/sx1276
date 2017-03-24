@@ -97,12 +97,14 @@ type InterruptPin struct {
 	pinName string
 	rpiName string
 
-	Irq chan struct{}
+	Irq   chan struct{}
+	latch chan struct{}
 }
 
 func NewIntPin(pinName, rpiName string) (intPin InterruptPin, err error) {
 	intPin.pinName = pinName
 	intPin.Irq = make(chan struct{})
+	intPin.latch = make(chan struct{})
 
 	intPin.DigitalPin, err = embd.NewDigitalPin(rpiName)
 	if err != nil {
@@ -111,6 +113,8 @@ func NewIntPin(pinName, rpiName string) (intPin InterruptPin, err error) {
 
 	intPin.SetDirection(embd.In)
 	intPin.Watch(embd.EdgeRising, func(pin embd.DigitalPin) {
+		// There isn't always something listening on the other end, so use
+		// non-blocking sends.
 		select {
 		case intPin.Irq <- struct{}{}:
 		default:
@@ -118,6 +122,26 @@ func NewIntPin(pinName, rpiName string) (intPin InterruptPin, err error) {
 	})
 
 	return
+}
+
+// Interrupts are non-blocking sends on a channel. Some operations can trigger
+// an interrupt before returning so we need to be able to capture interrupts
+// concurrently.
+//
+// Receives the interrupt into blocking send.
+// Run in a goroutine, Unlatch, do something, Unlatch again.
+func (intPin *InterruptPin) Latch() {
+	// Signal that we've started execution.
+	intPin.latch <- struct{}{}
+	// Capture the interrupt.
+	intPin.latch <- <-intPin.Irq
+}
+
+// Used to wait for a latched interrupt. Should be called twice per latch,
+// once immediately after go intPin.Latch() and again after the operation that
+// triggers the interrupt.
+func (intPin *InterruptPin) Unlatch() {
+	<-intPin.latch
 }
 
 func (intPin InterruptPin) String() string {
@@ -290,16 +314,11 @@ func (sx SX1276) SetOpMode(mode OpMode) error {
 		return errors.New("invalid operating mode")
 	}
 
-	// The ModeReady interrupt may occur on DIO5 before we've returned from
-	// writing the new OpMode, so start listening _before_ we write anything.
-	dio5 := make(chan struct{})
-	go func() {
-		dio5 <- <-sx.DIO5.Irq
-	}()
-
+	go sx.DIO5.Latch()
+	sx.DIO5.Unlatch()
 	val := sx.ReadReg(RegOpMode)
 	sx.WriteReg(RegOpMode, (val&0xF8)|byte(mode))
-	<-dio5
+	sx.DIO5.Unlatch()
 
 	return nil
 }
